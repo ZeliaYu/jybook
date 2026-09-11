@@ -404,7 +404,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 </div>
 
 <!-- ========== PAGE: RECORDS ========== -->
-<div class="page active" id="page-records">
+<div class="page" id="page-records">
   <div class="header"><h1>记录</h1></div>
   <div class="month-nav">
     <button onclick="changeMonth(-1)">
@@ -419,7 +419,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 </div>
 
 <!-- ========== PAGE: ADD ========== -->
-<div class="page" id="page-add">
+<div class="page active" id="page-add">
   <div class="add-header"><h2>记一笔</h2></div>
   <div class="amount-display">
     <input type="number" id="addAmount" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
@@ -481,11 +481,11 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>
     <span>首页</span>
   </button>
-  <button class="nav-item active" onclick="goPage('records',this)">
+  <button class="nav-item" onclick="goPage('records',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     <span>记录</span>
   </button>
-  <button class="nav-item" onclick="goPage('add',this)">
+  <button class="nav-item active" onclick="goPage('add',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14m-7-7h14"/></svg>
     <span>记账</span>
   </button>
