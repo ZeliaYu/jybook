@@ -1,5 +1,5 @@
 // 记一笔 PWA Service Worker
-const CACHE_NAME = 'jybook-v2';
+const CACHE_NAME = 'jybook-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
