@@ -432,7 +432,7 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   <div class="cat-grid" id="addCatGrid"></div>
   <div class="add-field">
     <label>备注</label>
-    <textarea id="addNote" placeholder="今天花了什么？"></textarea>
+    <textarea id="addNote" placeholder="有什么要记录的吗？"></textarea>
   </div>
   <div class="add-field">
     <label>日期</label>
@@ -529,6 +529,8 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   <div class="modal">
     <div class="modal-title">记录详情</div>
     <div id="detailContent"></div>
+    <button class="btn-primary" onclick="saveNote()">保存备注</button>
+    <div style="height:10px"></div>
     <div class="del-confirm">
       <button class="cancel" onclick="closeDetailModal()">关闭</button>
       <button class="confirm" onclick="deleteRecord()">删除记录</button>
@@ -608,6 +610,7 @@ function init() {
   document.getElementById('todayDate').textContent = formatDate(new Date());
   document.getElementById('addDate').value = toDateString(new Date());
 
+  renderAddCatGrid();
   renderAll();
 }
 
@@ -1129,10 +1132,23 @@ function showDetail(id) {
       <div style="font-size:2.4rem;margin-bottom:8px">${cat ? cat.icon : '❓'}</div>
       <div style="font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono','Roboto Mono',monospace;color:${col}">${prefix}¥${formatMoney(r.amount)}</div>
       <div style="color:var(--text-2);margin-top:6px;font-size:.85rem">${cat ? cat.name : '已删除分类'}</div>
-      ${r.note ? `<div style="color:var(--text-3);margin-top:4px;font-size:.8rem">${esc(r.note)}</div>` : ''}
       <div style="color:var(--text-3);margin-top:8px;font-size:.75rem;font-family:'JetBrains Mono','Roboto Mono',monospace">${r.date}</div>
+    </div>
+    <div class="add-field" style="margin-top:8px">
+      <label>备注</label>
+      <textarea id="detailNote" placeholder="点这里输入或修改备注" maxlength="200">${r.note ? esc(r.note) : ''}</textarea>
     </div>`;
   document.getElementById('detailModal').classList.add('show');
+}
+
+function saveNote() {
+  const r = data.records.find(x => x.id === selectedRecordId);
+  if (!r) return;
+  r.note = document.getElementById('detailNote').value.trim();
+  save();
+  closeDetailModal();
+  renderAll();
+  toast(r.note ? '备注已保存 ✓' : '备注已清除');
 }
 
 function closeDetailModal() {
