@@ -381,6 +381,29 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
 }
 .chart-toggle button.active { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
 
+/* ============ KEYBOARD (输入法遮挡) ============ */
+/* 弹窗是贴底面板，键盘弹出时如果只在面板内部滚动，面板位置不动，
+   备注栏会一直停在键盘下面。所以只要输入框获得焦点，就把面板整体抬到屏幕上半部。
+   这里不依赖能否量出键盘高度——安装成 PWA 后 visualViewport 常常不随键盘变化，
+   高度交给下面的 JS（留白 + scrollIntoView）来兜。
+   不支持 :has() 的旧浏览器走 JS 那条路，效果差一些但不会卡住。 */
+.modal-overlay:has(textarea:focus),
+.modal-overlay:has(input:focus) {
+  align-items: flex-start;
+  padding-top: 6vh;
+  padding-bottom: max(var(--kb, 0px), env(safe-area-inset-bottom));
+}
+.modal-overlay:has(textarea:focus) .modal,
+.modal-overlay:has(input:focus) .modal {
+  border-radius: var(--radius);
+  max-height: calc(100dvh - var(--kb, 0px) - 12vh);
+}
+/* 输入框聚焦时页面底部留一大段空白，保证 window 一定能滚动，
+   这样 scrollIntoView 才有空间把输入框带到键盘上方。 */
+body.field-focus {
+  padding-bottom: calc(100px + max(8px, env(safe-area-inset-bottom)) + 55vh);
+}
+
 /* ============ TOAST ============ */
 .toast {
   position:fixed; top:20px; left:50%; transform:translateX(-50%);
@@ -611,12 +634,6 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   <div class="modal">
     <div class="modal-title">记录详情</div>
     <div id="detailContent"></div>
-    <button class="btn-primary" onclick="saveNote()">保存备注</button>
-    <div style="height:10px"></div>
-    <div class="del-confirm">
-      <button class="cancel" onclick="closeDetailModal()">关闭</button>
-      <button class="confirm" onclick="deleteRecord()">删除记录</button>
-    </div>
   </div>
 </div>
 
@@ -1292,17 +1309,19 @@ function showDetail(id) {
   const prefix = r.type === 'income' ? '+' : '-';
   const col = r.type === 'income' ? 'var(--accent)' : 'var(--danger)';
   document.getElementById('detailContent').innerHTML = `
-    <div style="text-align:center;padding:16px 0">
-      <div style="font-size:2.4rem;margin-bottom:8px">${cat ? cat.icon : '❓'}</div>
-      <div style="font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono','Roboto Mono',monospace;color:${col}">${prefix}¥${formatMoney(r.amount)}</div>
-      <div style="color:var(--text-2);margin-top:6px;font-size:.85rem">${cat ? cat.name : '已删除分类'}</div>
-      <div style="color:var(--text-3);margin-top:8px;font-size:.75rem;font-family:'JetBrains Mono','Roboto Mono',monospace">${r.date}${formatTime(r.ts) ? ' ' + formatTime(r.ts) : ''}</div>
-    </div>
     <div class="add-field" style="margin-top:8px">
       <label>备注</label>
       <textarea id="detailNote" placeholder="点这里输入或修改备注" maxlength="200">${r.note ? esc(r.note) : ''}</textarea>
+    </div>
+    <div style="height:8px"></div>
+    <button class="btn-primary" onclick="saveNote()">保存备注</button>
+    <div style="height:10px"></div>
+    <div class="del-confirm">
+      <button class="cancel" onclick="closeDetailModal()">关闭</button>
+      <button class="confirm" onclick="deleteRecord()">删除记录</button>
     </div>`;
   document.getElementById('detailModal').classList.add('show');
+  updateKeyboard();
 }
 
 function saveNote() {
@@ -1317,7 +1336,10 @@ function saveNote() {
 
 function closeDetailModal() {
   document.getElementById('detailModal').classList.remove('show');
+  const hadFocus = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+  if (hadFocus) document.activeElement.blur();
   selectedRecordId = null;
+  if (hadFocus) updateKeyboard(); // 收掉 field-focus 的底部留白
   // 从分类详情点进来的记录被删掉后，列表要跟着刷新
   if (catDetailId) showCatDetail(catDetailId);
 }
@@ -1343,29 +1365,48 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
 });
 
 // ====== KEYBOARD ======
-// 手机上弹出输入法时，用 visualViewport 量出键盘高度，写进 CSS 变量 --kb，
-// 让页面底部留白 + 弹窗上移；否则备注栏会被输入法挡住。
+// 记录详情 / 分类详情的备注栏在手机上会被输入法挡住。两条腿走路：
+// 1) 只要输入框获得焦点，就用 CSS（:has(textarea:focus)）把弹窗抬到屏幕上半部——
+//    不依赖能否量出键盘高度；
+// 2) 同时在下方垫出 55vh 的空白，保证窗口一定可滚动，
+//    再用 scrollIntoView 把输入框滚到可视区域中间。
+// 安装成 PWA（standalone）后 visualViewport 常常不随键盘变化，所以 --kb 只是锦上添花，
+// 量不到也不影响上面的效果。
 const vv = window.visualViewport;
 function updateKeyboard() {
+  const hasFocus = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+  document.body.classList.toggle('field-focus', !!hasFocus);
+
   if (!vv) return;
   const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
   // 小于 80px 的多半是地址栏伸缩造成的抖动，不算键盘
   const open = kb > 80;
   document.documentElement.style.setProperty('--kb', open ? kb + 'px' : '0px');
   document.body.classList.toggle('kb-open', open);
-  if (open && document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
-    // 等布局按新的留白重排后再滚动，否则算出来的位置是旧的
-    setTimeout(() => {
-      try { document.activeElement.scrollIntoView({ block: 'center' }); } catch(e) {}
-    }, 50);
-  }
+  if (open && hasFocus) scrollActiveIntoView();
+}
+
+function scrollActiveIntoView() {
+  const el = document.activeElement;
+  if (!el || !/INPUT|TEXTAREA/.test(el.tagName)) return;
+  // 等布局按新的留白重排后再滚动，否则算出来的位置是旧的
+  setTimeout(() => {
+    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(e) {}
+  }, 120);
 }
 if (vv) {
   vv.addEventListener('resize', updateKeyboard);
   vv.addEventListener('scroll', updateKeyboard);
-  window.addEventListener('focusin', updateKeyboard);
-  window.addEventListener('focusout', () => setTimeout(updateKeyboard, 50));
 }
+window.addEventListener('focusin', e => {
+  updateKeyboard();
+  // 键盘弹起要几百毫秒，这时 scrollIntoView 一次；弹完再滚一次才对得准
+  if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) {
+    setTimeout(scrollActiveIntoView, 320);
+    setTimeout(scrollActiveIntoView, 650);
+  }
+});
+window.addEventListener('focusout', () => setTimeout(updateKeyboard, 60));
 
 // ====== INIT ======
 init();
