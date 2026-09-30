@@ -99,7 +99,20 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   width:120px; height:120px; border-radius:50%;
   background:radial-gradient(circle, var(--accent-glow), transparent 70%);
 }
-.overview-label { font-size:.8rem; color:var(--text-2); margin-bottom:8px; }
+.overview-head {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:8px; position:relative;
+}
+.overview-label { font-size:.8rem; color:var(--text-2); }
+.overview-tabs { display:flex; gap:6px; }
+.overview-tabs button {
+  padding:4px 12px; border-radius:14px; font-size:.72rem; font-weight:500;
+  border:1px solid #ffffff20; background:#ffffff08; color:var(--text-2);
+  cursor:pointer; transition:all .2s;
+}
+.overview-tabs button.active {
+  background:var(--accent-dim); color:var(--accent); border-color:var(--accent);
+}
 .overview-amount {
   font-size:2.2rem; font-weight:700; font-family:'JetBrains Mono','Roboto Mono',monospace;
   letter-spacing:-.03em; position:relative;
@@ -109,6 +122,18 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   display:flex; gap:20px; margin-top:16px; padding-top:16px;
   border-top:1px solid #ffffff10;
 }
+.overview-summary {
+  display:flex; gap:16px; margin-top:14px; padding-top:12px;
+  border-top:1px solid #ffffff10; position:relative;
+}
+.overview-summary .sum-item { flex:1; min-width:0; }
+.overview-summary .sum-label { font-size:.68rem; color:var(--text-3); margin-bottom:3px; }
+.overview-summary .sum-value {
+  font-size:.9rem; font-weight:500; font-family:'JetBrains Mono','Roboto Mono',monospace;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.overview-summary .sum-value.income { color:var(--accent); }
+.overview-summary .sum-value.expense { color:var(--danger); }
 .stat-item { flex:1; }
 .stat-label { font-size:.7rem; color:var(--text-3); margin-bottom:4px; }
 .stat-value {
@@ -378,7 +403,13 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   </div>
 
   <div class="overview-card">
-    <div class="overview-label">本月支出</div>
+    <div class="overview-head">
+      <div class="overview-label" id="overviewLabel">本月支出</div>
+      <div class="overview-tabs">
+        <button class="active" data-type="expense" onclick="setHomeType('expense')">支出</button>
+        <button data-type="income" onclick="setHomeType('income')">收入</button>
+      </div>
+    </div>
     <div class="overview-amount" id="monthTotal">0</div>
     <div class="overview-stats">
       <div class="stat-item">
@@ -394,9 +425,23 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
         <div class="stat-value expense" id="monthMax">0</div>
       </div>
     </div>
+    <div class="overview-summary">
+      <div class="sum-item">
+        <div class="sum-label">本月收入</div>
+        <div class="sum-value income" id="summaryIncome">¥0</div>
+      </div>
+      <div class="sum-item">
+        <div class="sum-label">本月支出</div>
+        <div class="sum-value expense" id="summaryExpense">¥0</div>
+      </div>
+      <div class="sum-item">
+        <div class="sum-label">结余</div>
+        <div class="sum-value" id="summaryBalance">¥0</div>
+      </div>
+    </div>
   </div>
 
-  <div class="section-title">分类占比</div>
+  <div class="section-title" id="catBreakdownTitle">分类占比</div>
   <div id="catBreakdown"></div>
 
   <div class="section-title">最近记录</div>
@@ -588,6 +633,7 @@ let data = {
 let currentMonth = new Date();
 let currentYear, currentMonthNum;
 let addType = 'expense';
+let homeType = 'expense';
 let selectedCatId = null;
 let editingCatId = null;
 let selectedRecordId = null;
@@ -701,23 +747,48 @@ function renderAll() {
 }
 
 // ====== HOME ======
+function setHomeType(type) {
+  homeType = type;
+  document.querySelectorAll('.overview-tabs button').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  renderHome();
+}
+
 function renderHome() {
   const recs = getMonthRecords();
   const expenses = recs.filter(r => r.type === 'expense');
-  const total = expenses.reduce((s,r) => s + r.amount, 0);
+  const incomes = recs.filter(r => r.type === 'income');
+  const totalExpense = expenses.reduce((s,r) => s + r.amount, 0);
+  const totalIncome = incomes.reduce((s,r) => s + r.amount, 0);
+  const balance = totalIncome - totalExpense;
+
+  const cur = homeType === 'income' ? incomes : expenses;
+  const total = homeType === 'income' ? totalIncome : totalExpense;
   const daysInMonth = new Date(currentYear, currentMonthNum + 1, 0).getDate();
   const daysPassed = (currentYear === new Date().getFullYear() && currentMonthNum === new Date().getMonth())
     ? new Date().getDate() : daysInMonth;
 
+  document.getElementById('overviewLabel').textContent = homeType === 'income' ? '本月收入' : '本月支出';
   document.getElementById('monthTotal').textContent = formatMoney(total);
-  document.getElementById('monthCount').textContent = expenses.length;
+  document.getElementById('monthCount').textContent = cur.length;
   document.getElementById('monthDaily').textContent = formatMoney(daysPassed > 0 ? total / daysPassed : 0);
-  document.getElementById('monthMax').textContent = expenses.length > 0
-    ? formatMoney(Math.max(...expenses.map(r => r.amount))) : '0';
+  document.getElementById('monthMax').textContent = cur.length > 0
+    ? formatMoney(Math.max(...cur.map(r => r.amount))) : '0';
 
-  // Category breakdown
+  // 金额主色调随类型切换
+  document.getElementById('monthDaily').className = 'stat-value ' + (homeType === 'income' ? 'income' : 'expense');
+  document.getElementById('monthMax').className = 'stat-value ' + (homeType === 'income' ? 'income' : 'expense');
+
+  // 收支总览
+  document.getElementById('summaryIncome').textContent = '¥' + formatMoney(totalIncome);
+  document.getElementById('summaryExpense').textContent = '¥' + formatMoney(totalExpense);
+  const balEl = document.getElementById('summaryBalance');
+  balEl.textContent = (balance < 0 ? '-' : '') + '¥' + formatMoney(Math.abs(balance));
+  balEl.style.color = balance >= 0 ? 'var(--accent)' : 'var(--danger)';
+
+  // Category breakdown（按当前类型）
+  document.getElementById('catBreakdownTitle').textContent = homeType === 'income' ? '收入分类占比' : '分类占比';
   const catMap = {};
-  expenses.forEach(r => {
+  cur.forEach(r => {
     catMap[r.catId] = (catMap[r.catId] || 0) + r.amount;
   });
   const sorted = Object.entries(catMap).sort((a,b) => b[1] - a[1]);
@@ -743,7 +814,7 @@ function renderHome() {
       </div>`;
   });
   if (sorted.length === 0) {
-    html = '<div style="text-align:center;color:var(--text-3);padding:20px;font-size:.85rem">暂无记录</div>';
+    html = `<div style="text-align:center;color:var(--text-3);padding:20px;font-size:.85rem">本月暂无${homeType === 'income' ? '收入' : '支出'}记录</div>`;
   }
   document.getElementById('catBreakdown').innerHTML = html;
 
