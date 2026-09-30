@@ -29,6 +29,7 @@
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 html { font-size:15px; }
+:root { --kb: 0px; } /* 键盘占位高度，由脚本更新 */
 body {
   font-family: system-ui, -apple-system, 'HarmonyOS Sans SC', 'MiSans', 'Noto Sans CJK SC', sans-serif;
   background: var(--bg);
@@ -36,9 +37,12 @@ body {
   min-height: 100dvh;
   max-width: 480px;
   margin: 0 auto;
-  padding-bottom: 80px;
+  /* 底部留出导航栏 + 输入法的高度：手机上弹出键盘时，备注栏就不会被挡住 */
+  padding-bottom: calc(100px + max(8px, env(safe-area-inset-bottom)) + var(--kb, 0px));
   -webkit-tap-highlight-color: transparent;
 }
+/* 键盘弹出时导航栏收起，避免悬浮在输入框上方 */
+body.kb-open .nav { display:none; }
 input, select, textarea, button { font-family: inherit; font-size: inherit; }
 
 /* ============ NAV ============ */
@@ -321,7 +325,13 @@ input, select, textarea, button { font-family: inherit; font-size: inherit; }
   border-radius:var(--radius) var(--radius) 0 0;
   padding:24px 20px max(24px, env(safe-area-inset-bottom));
   animation:slideUp .3s ease;
+  /* 键盘弹出时抬到键盘上方，内部可滚动，备注栏不会藏在输入法后面 */
+  max-height: calc(100dvh - var(--kb, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+/* 键盘高度用 padding 撑开遮罩，让弹窗整体上移（保留 slideUp 入场动画） */
+.modal-overlay { padding-bottom: var(--kb, 0px); }
 @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
 .modal-title { font-size:1.1rem; font-weight:700; margin-bottom:20px; text-align:center; }
 .modal > .record-item { margin-bottom:6px; }
@@ -1331,6 +1341,31 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
     else m.classList.remove('show');
   });
 });
+
+// ====== KEYBOARD ======
+// 手机上弹出输入法时，用 visualViewport 量出键盘高度，写进 CSS 变量 --kb，
+// 让页面底部留白 + 弹窗上移；否则备注栏会被输入法挡住。
+const vv = window.visualViewport;
+function updateKeyboard() {
+  if (!vv) return;
+  const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  // 小于 80px 的多半是地址栏伸缩造成的抖动，不算键盘
+  const open = kb > 80;
+  document.documentElement.style.setProperty('--kb', open ? kb + 'px' : '0px');
+  document.body.classList.toggle('kb-open', open);
+  if (open && document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
+    // 等布局按新的留白重排后再滚动，否则算出来的位置是旧的
+    setTimeout(() => {
+      try { document.activeElement.scrollIntoView({ block: 'center' }); } catch(e) {}
+    }, 50);
+  }
+}
+if (vv) {
+  vv.addEventListener('resize', updateKeyboard);
+  vv.addEventListener('scroll', updateKeyboard);
+  window.addEventListener('focusin', updateKeyboard);
+  window.addEventListener('focusout', () => setTimeout(updateKeyboard, 50));
+}
 
 // ====== INIT ======
 init();
